@@ -69,100 +69,89 @@ using namespace std;
 //  
 
 
-CSparse2d::CSparse2d()
-{
-  A = NULL;
-  AF = NULL;
+CSparse2d::CSparse2d() {
+    A = NULL;
+    AF = NULL;
 #ifdef SBA_CHOLMOD
-  chA = NULL;
-  chInited = false;
-  Common.print=0;
+    chA = NULL;
+    chInited = false;
+    Common.print=0;
 #endif
-  asize = 0;
-  csize = 0;
-  nnz = 0;
-  Bprev.resize(0);
+    asize = 0;
+    csize = 0;
+    nnz = 0;
+    Bprev.resize(0);
 }
 
-CSparse2d::~CSparse2d()
-{
-  if (A) cs_spfree(A);        // free any previous structure
-  if (AF) cs_spfree(AF);      // free any previous structure
+CSparse2d::~CSparse2d() {
+    if (A) cs_spfree(A);        // free any previous structure
+    if (AF) cs_spfree(AF);      // free any previous structure
 }
 
 
 // 3x3 sparse jacobian blocks
-void CSparse2d::setupBlockStructure(int n, bool eraseit)
-{
-  // set up initial structure
-  diag.resize(n);
-  cols.resize(n);
-  if (eraseit)
-  {
-    for (int i=0; i<(int)cols.size(); i++)
-    {
-      map<int,Matrix<double,3,3>, less<int>, 
-      aligned_allocator< Matrix <double,3,3> > > &col = cols[i];
-      col.clear();
-    }
-  }
-  asize = n;
-  csize = 3*n;
-  
-  if (eraseit)
-  {
-    // zero out entries
-    B.setZero(csize);
-    for (int i=0; i<(int)diag.size(); i++)
-    {
-      diag[i].setZero();
-    }
-    for (int i=0; i<(int)cols.size(); i++)
-    {
-      map<int,Matrix<double,3,3>, less<int>, 
-      aligned_allocator<Matrix<double,3,3> > > &col = cols[i];
-      if (col.size() > 0)
-      {
-        map<int,Matrix<double,3,3>, less<int>, 
-        aligned_allocator<Matrix<double,3,3> > >::iterator it;
-        for (it = col.begin(); it != col.end(); it++)
-        {
-          it->second.setZero();
+void CSparse2d::setupBlockStructure(int n, bool eraseit) {
+    // set up initial structure
+    diag.resize(n);
+    cols.resize(n);
+    if (eraseit) {
+        for (int i = 0; i < (int) cols.size(); i++) {
+            map < int, Matrix < double, 3, 3 >, less < int >,
+                    aligned_allocator < Matrix < double, 3, 3 > > > &col = cols[i];
+            col.clear();
         }
-      }
     }
-  }else // here we just resize B, saving the old parts
-  {
-    B.setZero(csize);
-    if (Bprev.size() > 0)
+    asize = n;
+    csize = 3 * n;
+
+    if (eraseit) {
+        // zero out entries
+        B.setZero(csize);
+        for (int i = 0; i < (int) diag.size(); i++) {
+            diag[i].setZero();
+        }
+        for (int i = 0; i < (int) cols.size(); i++) {
+            map < int, Matrix < double, 3, 3 >, less < int >,
+                    aligned_allocator < Matrix < double, 3, 3 > > > &col = cols[i];
+            if (col.size() > 0) {
+                map < int, Matrix < double, 3, 3 >, less < int >,
+                        aligned_allocator < Matrix < double, 3, 3 > > > ::iterator
+                it;
+                for (it = col.begin(); it != col.end(); it++) {
+                    it->second.setZero();
+                }
+            }
+        }
+    } else // here we just resize B, saving the old parts
     {
-      B.head(Bprev.size()) = Bprev;
+        B.setZero(csize);
+        if (Bprev.size() > 0) {
+            B.head(Bprev.size()) = Bprev;
+        }
     }
-  }
 }
 
 
 // add an off-diagonal block
-void CSparse2d::addOffdiagBlock(Matrix<double,3,3> &m, int ii, int jj)
-{
-  // get column 
-  map<int,Matrix<double,3,3>, less<int>, 
-  aligned_allocator<Matrix<double,3,3> > > &col = cols[jj];
-  // find current matrix
-  map<int,Matrix<double,3,3>, less<int>, 
-  aligned_allocator<Matrix<double,3,3> > >::iterator it;
-  it = col.find(ii);
-  if (it == col.end())        // didn't find it
-    col.insert(pair<int,Matrix<double,3,3> >(ii,m));
-  else                        // found it, add
-    it->second += m;
+void CSparse2d::addOffdiagBlock(Matrix<double, 3, 3> &m, int ii, int jj) {
+    // get column
+    map < int, Matrix < double, 3, 3 >, less < int >,
+            aligned_allocator < Matrix < double, 3, 3 > > > &col = cols[jj];
+    // find current matrix
+    map < int, Matrix < double, 3, 3 >, less < int >,
+            aligned_allocator < Matrix < double, 3, 3 > > > ::iterator
+    it;
+    it = col.find(ii);
+    if (it == col.end())        // didn't find it
+        col.insert(pair < int, Matrix < double, 3, 3 > > (ii, m));
+    else                        // found it, add
+        it->second += m;
 }
 
 
-void CSparse2d::incDiagBlocks(double lam)
-{
-  for (int i=0; i<(int)diag.size(); i++)
-    diag[i].diagonal() *= lam;
+void CSparse2d::incDiagBlocks(double lam) {
+    for (int i = 0; i < (int) diag.size(); i++)
+        diag[i].diagonal() *= lam;
 }
 
 
@@ -172,234 +161,222 @@ void CSparse2d::incDiagBlocks(double lam)
 // this version only sets upper triangular matrix,
 // should set whole thing
 
-void CSparse2d::setupCSstructure(double diaginc, bool init)
-{
+void CSparse2d::setupCSstructure(double diaginc, bool init) {
 #ifdef SBA_CHOLMOD
-  if (useCholmod) {
-    cholmod_start(&Common); // this is finished in doChol()
-    Common.print = 0;
-  }
+    if (useCholmod) {
+      cholmod_start(&Common); // this is finished in doChol()
+      Common.print = 0;
+    }
 #endif
-  
-  // reserve space and set things up
-  if (init || useCholmod)
-  {
-    if (A) cs_spfree(A);    // free any previous structure
-    
-    // count entries for cs allocation
-    nnz = 6*asize;         // diagonal entries, just upper triangle
-    for (int i=0; i<(int)cols.size(); i++)
-    {
-      map<int,Matrix<double,3,3>, less<int>, 
-      aligned_allocator<Matrix<double,3,3> > > &col = cols[i];
-      nnz += 9 * col.size(); // 3x3 matrix
-    }
-#ifdef SBA_CHOLMOD
-    if (useCholmod)
-    {
-      //            cholmod_start(&Common); // this is finished in doChol()
-      //            if (chA) 
-      //            cholmod_free_sparse(&chA, &Common);
-      chA = cholmod_allocate_sparse(csize,csize,nnz,true,true,1,CHOLMOD_REAL,&Common);
-    }
-    else
-#endif
-    {
-      A = cs_spalloc(csize,csize,nnz,1,0); // allocate sparse matrix
-    }
-    
-    // now figure out the column pointers
-    int colp = 0;           // index of where the column starts in Ai
-    int *Ap, *Ai;
-#ifdef SBA_CHOLMOD
-    if (useCholmod)
-    {
-      Ap = (int *)chA->p; // column pointer
-      Ai = (int *)chA->i; // row indices
-    }
-    else
-#endif
-    {
-      Ap = A->p;          // column pointer
-      Ai = A->i;          // row indices
-    }
-    
-    for (int i=0; i<(int)cols.size(); i++)
-    {
-      // column i entries
-      map<int,Matrix<double,3,3>, less<int>, 
-      aligned_allocator<Matrix<double,3,3> > > &col = cols[i];
-      
-      // do this for 3 columns
-      for (int k=0; k<3; k++)
-      {
-        *Ap++ = colp;
-        int row;
-        
-        // iterate over the map
-        if (col.size() > 0)
-        {
-          // map iterator
-          map<int,Matrix<double,3,3>, less<int>, 
-          aligned_allocator<Matrix<double,3,3> > >::iterator it;
-          
-          // iterate over block column entries
-          for (it = col.begin(); it != col.end(); it++)
-          {
-            row = 3*it->first; // which row we're at
-            for (int j=0; j<3; j++)
-              Ai[colp++] = row++;
-          }
+
+    // reserve space and set things up
+    if (init || useCholmod) {
+        if (A) cs_spfree(A);    // free any previous structure
+
+        // count entries for cs allocation
+        nnz = 6 * asize;         // diagonal entries, just upper triangle
+        for (int i = 0; i < (int) cols.size(); i++) {
+            map < int, Matrix < double, 3, 3 >, less < int >,
+                    aligned_allocator < Matrix < double, 3, 3 > > > &col = cols[i];
+            nnz += 9 * col.size(); // 3x3 matrix
         }
-        
-        // add in diagonal entries
-        row = 3*i;
-        for (int kk=0; kk<k+1; kk++)
-          Ai[colp++] = row++;
-      }
-    }        
-    *Ap = nnz;       // last entry
-  }
-  
-  // now put the entries in place
-  int colp = 0;           // index of where the column starts in Ai
-  double *Ax;
 #ifdef SBA_CHOLMOD
-  if (useCholmod)
-    Ax = (double *)chA->x;   // values
-    else
-#endif
-      Ax = A->x;               // values
-      
-      for (int i=0; i<(int)cols.size(); i++)
-      {
-        // column i entries
-        map<int,Matrix<double,3,3>, less<int>, 
-        aligned_allocator<Matrix<double,3,3> > > &col = cols[i];
-        
-        // do this for 3 columns
-        for (int k=0; k<3; k++)
+        if (useCholmod)
         {
-          // iterate over the map
-          if (col.size() > 0)
-          {
-            // map iterator
-            map<int,Matrix<double,3,3>, less<int>, 
-            aligned_allocator<Matrix<double,3,3> > >::iterator it;
-            
-            // iterate over block column entries
-            for (it = col.begin(); it != col.end(); it++)
-            {
-              Matrix<double,3,3> &m = it->second;
-              for (int j=0; j<3; j++)
-                Ax[colp++] = m(j,k);
+          //            cholmod_start(&Common); // this is finished in doChol()
+          //            if (chA)
+          //            cholmod_free_sparse(&chA, &Common);
+          chA = cholmod_allocate_sparse(csize,csize,nnz,true,true,1,CHOLMOD_REAL,&Common);
+        }
+        else
+#endif
+        {
+            A = cs_spalloc(csize, csize, nnz, 1, 0); // allocate sparse matrix
+        }
+
+        // now figure out the column pointers
+        int colp = 0;           // index of where the column starts in Ai
+        int *Ap, *Ai;
+#ifdef SBA_CHOLMOD
+        if (useCholmod)
+        {
+          Ap = (int *)chA->p; // column pointer
+          Ai = (int *)chA->i; // row indices
+        }
+        else
+#endif
+        {
+            Ap = A->p;          // column pointer
+            Ai = A->i;          // row indices
+        }
+
+        for (int i = 0; i < (int) cols.size(); i++) {
+            // column i entries
+            map < int, Matrix < double, 3, 3 >, less < int >,
+                    aligned_allocator < Matrix < double, 3, 3 > > > &col = cols[i];
+
+            // do this for 3 columns
+            for (int k = 0; k < 3; k++) {
+                *Ap++ = colp;
+                int row;
+
+                // iterate over the map
+                if (col.size() > 0) {
+                    // map iterator
+                    map < int, Matrix < double, 3, 3 >, less < int >,
+                            aligned_allocator < Matrix < double, 3, 3 > > > ::iterator
+                    it;
+
+                    // iterate over block column entries
+                    for (it = col.begin(); it != col.end(); it++) {
+                        row = 3 * it->first; // which row we're at
+                        for (int j = 0; j < 3; j++)
+                            Ai[colp++] = row++;
+                    }
+                }
+
+                // add in diagonal entries
+                row = 3 * i;
+                for (int kk = 0; kk < k + 1; kk++)
+                    Ai[colp++] = row++;
             }
-          } 
-          
-          // add in diagonal entries
-          Matrix<double,3,3> &m = diag[i]; // diagonal block
-          for (int kk=0; kk<k+1; kk++)
-            Ax[colp++] = m(kk,k);
-          Ax[colp-1] *= diaginc; // increment diagonal for LM
         }
-      }      
-      
-      // make symmetric from upper diagonal
-      // this could be more efficient if AT were eliminated and AF were fixed
-      // oops - chol_sol only needs upper diag
+        *Ap = nnz;       // last entry
+    }
+
+    // now put the entries in place
+    int colp = 0;           // index of where the column starts in Ai
+    double *Ax;
+#ifdef SBA_CHOLMOD
+    if (useCholmod)
+      Ax = (double *)chA->x;   // values
+      else
+#endif
+    Ax = A->x;               // values
+
+    for (int i = 0; i < (int) cols.size(); i++) {
+        // column i entries
+        map < int, Matrix < double, 3, 3 >, less < int >,
+                aligned_allocator < Matrix < double, 3, 3 > > > &col = cols[i];
+
+        // do this for 3 columns
+        for (int k = 0; k < 3; k++) {
+            // iterate over the map
+            if (col.size() > 0) {
+                // map iterator
+                map < int, Matrix < double, 3, 3 >, less < int >,
+                        aligned_allocator < Matrix < double, 3, 3 > > > ::iterator
+                it;
+
+                // iterate over block column entries
+                for (it = col.begin(); it != col.end(); it++) {
+                    Matrix<double, 3, 3> &m = it->second;
+                    for (int j = 0; j < 3; j++)
+                        Ax[colp++] = m(j, k);
+                }
+            }
+
+            // add in diagonal entries
+            Matrix<double, 3, 3> &m = diag[i]; // diagonal block
+            for (int kk = 0; kk < k + 1; kk++)
+                Ax[colp++] = m(kk, k);
+            Ax[colp - 1] *= diaginc; // increment diagonal for LM
+        }
+    }
+
+    // make symmetric from upper diagonal
+    // this could be more efficient if AT were eliminated and AF were fixed
+    // oops - chol_sol only needs upper diag
 }
 
 
 // uncompress the compressed A into a dense Eigen matrix
-void CSparse2d::uncompress(MatrixXd &m)
-{
-  if (!A) return;
-  m.setZero(csize,csize);
-  
-  int *Ap = A->p;             // column pointer
-  int *Ai = A->i;             // row indices
-  double *Ax = A->x;          // values;
-  
-  for (int i=0; i<csize; i++)
-  {
-    int rbeg = Ap[i];
-    int rend = Ap[i+1];
-    if (rend > rbeg)
-      for (int j=rbeg; j<rend; j++)
-        m(Ai[j],i) = Ax[j];
-  }
+void CSparse2d::uncompress(MatrixXd &m) {
+    if (!A) return;
+    m.setZero(csize, csize);
+
+    int *Ap = A->p;             // column pointer
+    int *Ai = A->i;             // row indices
+    double *Ax = A->x;          // values;
+
+    for (int i = 0; i < csize; i++) {
+        int rbeg = Ap[i];
+        int rend = Ap[i + 1];
+        if (rend > rbeg)
+            for (int j = rbeg; j < rend; j++)
+                m(Ai[j], i) = Ax[j];
+    }
 }
 
 // solve in place, returns RHS B
-bool CSparse2d::doChol()
-{
+bool CSparse2d::doChol() {
 #ifdef SBA_CHOLMOD
-  if (useCholmod)
-  {
-    cholmod_dense *x, b, *R, *R2;
-    cholmod_factor *L ;
-    double *Xx, *Rx, *bb;
-    double one [2], minusone [2];
-    one [0] = 1 ;
-    one [1] = 0 ;
-    minusone [0] = -1 ;
-    minusone [1] = 0 ;
-    
-    //        cholmod_start (&Common) ;    // start it up ???
-    cholmod_print_sparse (chA, (char *)"A", &Common) ; // print simple stats
-    b.nrow = csize;
-    b.ncol = 1;
-    b.d = csize;                // leading dimension (???)
-    b.nzmax = csize;
-    b.xtype = CHOLMOD_REAL;
-    b.dtype = CHOLMOD_DOUBLE;
-    b.x = B.data();
-    //cout << "CHOLMOD analyze..." << flush;
-    L = cholmod_analyze (chA, &Common) ; // analyze 
-    //cout << "factorize..." << flush;
-    cholmod_factorize (chA, L, &Common) ; // factorize 
-    //cout << "solve..." << flush;
-    x = cholmod_solve (CHOLMOD_A, L, &b, &Common) ; // solve Ax=b
-    //        cholmod_print_factor (L, (char *)"L", &Common) ;
-    
-    //cout << "refine" << endl;
-    // one step of iterative refinement, cheap
-    /* Ax=b was factorized and solved, R = B-A*X */
-    R = cholmod_copy_dense (&b, &Common) ;
-    cholmod_sdmult(chA, 0, minusone, one, x, R, &Common) ;
-    /* R2 = A\(B-A*X) */
-    R2 = cholmod_solve (CHOLMOD_A, L, R, &Common) ;
-    /* compute X = X + A\(B-A*X) */
-    Xx = (double *)x->x ;
-    Rx = (double *)R2->x ;
-    for (int i=0 ; i<csize ; i++)
+    if (useCholmod)
     {
-      Xx[i] = Xx[i] + Rx[i] ;
+      cholmod_dense *x, b, *R, *R2;
+      cholmod_factor *L ;
+      double *Xx, *Rx, *bb;
+      double one [2], minusone [2];
+      one [0] = 1 ;
+      one [1] = 0 ;
+      minusone [0] = -1 ;
+      minusone [1] = 0 ;
+
+      //        cholmod_start (&Common) ;    // start it up ???
+      cholmod_print_sparse (chA, (char *)"A", &Common) ; // print simple stats
+      b.nrow = csize;
+      b.ncol = 1;
+      b.d = csize;                // leading dimension (???)
+      b.nzmax = csize;
+      b.xtype = CHOLMOD_REAL;
+      b.dtype = CHOLMOD_DOUBLE;
+      b.x = B.data();
+      //cout << "CHOLMOD analyze..." << flush;
+      L = cholmod_analyze (chA, &Common) ; // analyze
+      //cout << "factorize..." << flush;
+      cholmod_factorize (chA, L, &Common) ; // factorize
+      //cout << "solve..." << flush;
+      x = cholmod_solve (CHOLMOD_A, L, &b, &Common) ; // solve Ax=b
+      //        cholmod_print_factor (L, (char *)"L", &Common) ;
+
+      //cout << "refine" << endl;
+      // one step of iterative refinement, cheap
+      /* Ax=b was factorized and solved, R = B-A*X */
+      R = cholmod_copy_dense (&b, &Common) ;
+      cholmod_sdmult(chA, 0, minusone, one, x, R, &Common) ;
+      /* R2 = A\(B-A*X) */
+      R2 = cholmod_solve (CHOLMOD_A, L, R, &Common) ;
+      /* compute X = X + A\(B-A*X) */
+      Xx = (double *)x->x ;
+      Rx = (double *)R2->x ;
+      for (int i=0 ; i<csize ; i++)
+      {
+        Xx[i] = Xx[i] + Rx[i] ;
+      }
+      cholmod_free_dense (&R2, &Common) ;
+      cholmod_free_dense (&R, &Common) ;
+
+      bb = B.data();
+      for (int i=0; i<csize; i++) // transfer answer
+        *bb++ = *Xx++;
+      cholmod_free_factor (&L, &Common) ; // free matrices
+      cholmod_free_dense (&x, &Common) ;
+      cholmod_free_sparse(&chA, &Common);
+      cholmod_finish (&Common) ;   // finish it ???
+
+      return true;
     }
-    cholmod_free_dense (&R2, &Common) ;
-    cholmod_free_dense (&R, &Common) ;
-    
-    bb = B.data();
-    for (int i=0; i<csize; i++) // transfer answer
-      *bb++ = *Xx++;
-    cholmod_free_factor (&L, &Common) ; // free matrices 
-    cholmod_free_dense (&x, &Common) ;
-    cholmod_free_sparse(&chA, &Common);
-    cholmod_finish (&Common) ;   // finish it ???
-    
-    return true;
-  }
-  else
+    else
 #endif
-  {
-    
-    // using order 0 here (natural order); 
-    // may be better to use "1" for large problems (AMD)
-    int order = 0;
-    if (csize > 100) order = 1;
-    bool ok = (bool)cs_cholsol(order,A,B.data()); // do the CSparse2d thang
-    return ok;
-  }
+    {
+
+        // using order 0 here (natural order);
+        // may be better to use "1" for large problems (AMD)
+        int order = 0;
+        if (csize > 100) order = 1;
+        bool ok = (bool) cs_cholsol(order, A, B.data()); // do the CSparse2d thang
+        return ok;
+    }
 }
 
 
