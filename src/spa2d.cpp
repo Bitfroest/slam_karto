@@ -888,14 +888,16 @@ void SysSPA2d::doDSIF(int newnode)
   
   t3 = utime();
 }
+#endif
 
 
-
-// write out the precision matrix for CSparse
+/// write out the precision matrix for CSparse
+/// \param fname
+/// \param useCSparse
 void SysSPA2d::writeSparseA(char *fname, bool useCSparse)
 {
   ofstream ofs(fname);
-  if (ofs == NULL)
+  if (!ofs)
   {
     cout << "Can't open file " << fname << endl;
     return;
@@ -904,7 +906,10 @@ void SysSPA2d::writeSparseA(char *fname, bool useCSparse)
   // cameras
   if (useCSparse)
   {
-    setupSparseSys(0.0,0);
+    int sparseType = 1;
+    /// 0 for dense Cholesky, 1 for sparse system,
+    /// 2 for gradient system, 3 for block jacobian PCG
+    setupSparseSys(0.0,0,sparseType);
     
     int *Ai = csp.A->i;
     int *Ap = csp.A->p;
@@ -933,7 +938,7 @@ void SysSPA2d::writeSparseA(char *fname, bool useCSparse)
   
   ofs.close();
 }
-#endif
+
 
 
 // return vector of connections
