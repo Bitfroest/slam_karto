@@ -39,9 +39,15 @@ void SpaSolver::Compute() {
 
     typedef std::vector <Node2d, Eigen::aligned_allocator<Node2d>> NodeVector;
 
+    //char *name = (char *)"test";
+    //m_Spa.writeSparseA((char *)"before_", false);
+    m_Spa.writeSparseA((char *)"before_t_", true);
+
     ROS_INFO("Calling doSPA for loop closure");
     m_Spa.doSPA(40);
     ROS_INFO("Finished doSPA for loop closure");
+    //m_Spa.writeSparseA((char *)"after_", false);
+    m_Spa.writeSparseA((char *)"after_t_", true);
     NodeVector nodes = m_Spa.getNodes();
     forEach(NodeVector, &nodes)
     {
