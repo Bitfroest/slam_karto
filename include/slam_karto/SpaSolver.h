@@ -55,10 +55,19 @@ public:
     /// x,y -> x',y'   4 floats per connection
     void getGraph(std::vector<float> &g) { m_Spa.getGraph(g); }
 
+    void WriteGraphFile(std::string name);
+
 private:
     karto::ScanSolver::IdPoseVector corrections;
 
+    std::vector <karto::Vertex<karto::LocalizedRangeScan> *> nodes;
+
+    std::vector <karto::Edge<karto::LocalizedRangeScan> *> edges;
+
     SysSPA2d m_Spa;
+
+    int optimizationNumber;
+
 };
 
 #endif // KARTO_SPASOLVER_H
