@@ -49,7 +49,7 @@ void SpaSolver::Compute() {
     ROS_INFO("Finished doSPA for loop closure");
     //m_Spa.writeSparseA((char *)"after_", false);
     //m_Spa.writeSparseA((char *) "after_t_", true);
-    WriteGraphFile("after_");
+
 
     NodeVector nodes = m_Spa.getNodes();
     forEach(NodeVector, &nodes)
@@ -58,6 +58,7 @@ void SpaSolver::Compute() {
         corrections.push_back(std::make_pair(iter->nodeId, pose));
         //std::cout << "[ INFO] [" << ros::Time::now() << "]: pose " << pose << std::endl;
     }
+    wasOptimized = true;
 }
 
 void SpaSolver::AddNode(karto::Vertex <karto::LocalizedRangeScan> *pVertex) {
@@ -68,6 +69,10 @@ void SpaSolver::AddNode(karto::Vertex <karto::LocalizedRangeScan> *pVertex) {
     // add new vertex to nodes
     // karto::Vertex <karto::LocalizedRangeScan> pVertexC = *pVertex;
     nodes.push_back(pVertex);
+    if (wasOptimized) {
+        WriteGraphFile("after_");
+        wasOptimized = false;
+    }
 }
 
 void SpaSolver::AddConstraint(karto::Edge <karto::LocalizedRangeScan> *pEdge) {
@@ -94,6 +99,44 @@ void SpaSolver::AddConstraint(karto::Edge <karto::LocalizedRangeScan> *pEdge) {
     edges.push_back(pEdge);
 }
 
+
+///
+/// Vertex/Node
+/// std::vector< Vertex< T > * > 	    GetAdjacentVertices () const
+/// const std::vector< Edge< T > * > & 	GetEdges () const
+/// T * 	                            GetObject () const
+///
+/// Edge
+/// EdgeLabel * 	    GetLabel ()
+/// Vertex< T > * 	    GetSource () const
+/// Vertex< T > * 	    GetTarget () const
+///
+/// LinkInfo inherited from EdgeLabel
+/// const Matrix3 & 	GetCovariance ()
+/// const Pose2 & 	    GetPose1 ()
+/// const Pose2 & 	    GetPose2 ()
+/// const Pose2 & 	    GetPoseDifference ()
+///
+/// LocalizedRangeScan
+/// const Pose2 & 	            GetBarycenterPose () const
+/// const BoundingBox2 & 	    GetBoundingBox () const
+/// const Pose2 & 	            GetCorrectedPose () const
+/// const Pose2 & 	            GetOdometricPose () const
+/// const PointVectorDouble & 	GetPointReadings (kt_bool wantFiltered=false) const
+/// Pose2 	                    GetReferencePose (kt_bool useBarycenter) const
+/// Pose2 	                    GetSensorAt (const Pose2 &rPose) const
+/// Pose2 	                    GetSensorPose () const
+///
+/// Pose
+/// kt_double 	                    GetHeading () const
+/// const Vector2< kt_double > & 	GetPosition () const
+/// kt_double 	                    GetX () const
+/// kt_double 	                    GetY () const
+///
+/// Matrix3
+/// std::string 	    ToString () const
+///
+/// \param name
 void SpaSolver::WriteGraphFile(std::string name) {
     // save result to File
     std::ofstream outputStream;
@@ -102,7 +145,7 @@ void SpaSolver::WriteGraphFile(std::string name) {
     // write all vertices to the file
     for (auto const &it: nodes) {
         karto::Pose2 pose = it->GetObject()->GetCorrectedPose();
-        outputStream << "NODE " << it->GetObject()->GetUniqueId() << " " << pose.GetX() << " " << pose.GetY() << " "
+        outputStream << "VERTEX_SE2 " << it->GetObject()->GetUniqueId() << " " << pose.GetX() << " " << pose.GetY() << " "
                      << pose.GetHeading() << std::endl;
     }
 
@@ -114,9 +157,9 @@ void SpaSolver::WriteGraphFile(std::string name) {
         karto::LinkInfo *pLinkInfo = (karto::LinkInfo * )(pEdge->GetLabel());
 
         karto::Pose2 diff = pLinkInfo->GetPoseDifference();
-        outputStream << "EDGE " << pSource->GetUniqueId() << " " << pTarget->GetUniqueId() << " " << diff.GetX() << " "
+        outputStream << "EDGE_SE2 " << pSource->GetUniqueId() << " " << pTarget->GetUniqueId() << " " << diff.GetX() << " "
                      << diff.GetY()
-                     << " " << diff.GetHeading() << std::endl;
+                     << " " << diff.GetHeading() << " " << pLinkInfo->GetCovariance() << " " << std::endl;
     }
 
     outputStream.close();

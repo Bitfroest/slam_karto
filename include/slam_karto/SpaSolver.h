@@ -68,6 +68,8 @@ private:
 
     int optimizationNumber;
 
+    bool wasOptimized = false;
+
 };
 
 #endif // KARTO_SPASOLVER_H
