@@ -17,5 +17,5 @@ Assumes an 'odom_combined' frame, that provides reasonably accurate odometry
   <node name="rviz" pkg="rviz" type="rviz" required="true"
       args="-d $(find slam_karto)/rviz/karto_slam.rviz" />
   <node name="playbag" pkg="rosbag" type="play"
-      args="--clock -r 5 $(arg bag_filename)" />
+      args="--clock -r 1 $(arg bag_filename)" />
 </launch>
