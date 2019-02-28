@@ -146,7 +146,7 @@ void SpaSolver::WriteGraphFile(std::string name) {
     for (auto const &it: nodes) {
         karto::Pose2 pose = it->GetObject()->GetCorrectedPose();
         outputStream << "VERTEX_SE2 " << it->GetObject()->GetUniqueId() << " " << pose.GetX() << " " << pose.GetY() << " "
-                     << pose.GetHeading() << std::endl;
+                     << pose.GetHeading() << "\n";
     }
 
     // write all edges to the file
@@ -159,7 +159,7 @@ void SpaSolver::WriteGraphFile(std::string name) {
         karto::Pose2 diff = pLinkInfo->GetPoseDifference();
         outputStream << "EDGE_SE2 " << pSource->GetUniqueId() << " " << pTarget->GetUniqueId() << " " << diff.GetX() << " "
                      << diff.GetY()
-                     << " " << diff.GetHeading() << " " << pLinkInfo->GetCovariance() << " " << std::endl;
+                     << " " << diff.GetHeading() << " " << pLinkInfo->GetCovariance() << "\n";
     }
 
     outputStream.close();
