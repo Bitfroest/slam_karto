@@ -117,7 +117,19 @@ void SpaSolver::AddConstraint(karto::Edge <karto::LocalizedRangeScan> *pEdge) {
 /// const Pose2 & 	    GetPose2 ()
 /// const Pose2 & 	    GetPoseDifference ()
 ///
-/// LocalizedRangeScan
+/// SensorData
+/// const CustomDataVector & 	GetCustomData () const
+/// const Name & 	            GetSensorName () const
+/// kt_int32s 	                GetStateId () const
+/// kt_double 	                GetTime () const
+/// kt_int32s 	                GetUniqueId () const
+///
+/// LaserRangeScan inherited from SensorData
+/// LaserRangeFinder * 	        GetLaserRangeFinder () const
+/// kt_int32u 	                GetNumberOfRangeReadings () const
+/// kt_double * 	            GetRangeReadings () const
+///
+/// LocalizedRangeScan inherited from LaserRangeScan
 /// const Pose2 & 	            GetBarycenterPose () const
 /// const BoundingBox2 & 	    GetBoundingBox () const
 /// const Pose2 & 	            GetCorrectedPose () const
@@ -145,8 +157,15 @@ void SpaSolver::WriteGraphFile(std::string name) {
     // write all vertices to the file
     for (auto const &it: nodes) {
         karto::Pose2 pose = it->GetObject()->GetCorrectedPose();
-        outputStream << "VERTEX_SE2 " << it->GetObject()->GetUniqueId() << " " << pose.GetX() << " " << pose.GetY() << " "
-                     << pose.GetHeading() << "\n";
+        outputStream << "VERTEX_SE2 " << it->GetObject()->GetUniqueId() << " " << pose.GetX() << " " << pose.GetY()
+                     << " "
+                     << pose.GetHeading();
+
+        // append range data to the output Stream
+        for (int i = 0; i < it->GetObject()->GetNumberOfRangeReadings(); ++i) {
+            outputStream << " " << *(it->GetObject()->GetRangeReadings() + i);
+        }
+        outputStream << "\n";
     }
 
     // write all edges to the file
@@ -157,7 +176,8 @@ void SpaSolver::WriteGraphFile(std::string name) {
         karto::LinkInfo *pLinkInfo = (karto::LinkInfo * )(pEdge->GetLabel());
 
         karto::Pose2 diff = pLinkInfo->GetPoseDifference();
-        outputStream << "EDGE_SE2 " << pSource->GetUniqueId() << " " << pTarget->GetUniqueId() << " " << diff.GetX() << " "
+        outputStream << "EDGE_SE2 " << pSource->GetUniqueId() << " " << pTarget->GetUniqueId() << " " << diff.GetX()
+                     << " "
                      << diff.GetY()
                      << " " << diff.GetHeading() << " " << pLinkInfo->GetCovariance() << "\n";
     }
